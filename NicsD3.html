@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Wine Reviews</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+
+<body>
+  <div class="container">
+    <div class="row">
+      <div class="col-md-12 jumbotron text-center">
+        <img src="/assets/img/winepic2.jpg" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-2">
+      </div>
+    </div>
+    <div id="sample-metadata" class="panel-body"></div>
+  </div>
+  </div>
+  <div class="col-md-5">
+    <div id="bar"></div>
+  </div>
+  <div class="col-md-5">
+    <div id="gauge"></div>
+  </div>
+  </div>
+  <div class="row">
+    <div class="col-md-12">
+      <div id="bubble"></div>
+    </div>
+  </div>
+  </div>
+</body>
+
+</html>
+
+
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+  <meta charset='utf-8'>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Wine Data Visualization</title>
+
+  <!-- Link to required libraries: D3.js, dc.js, crossfilter, and reductio -->
+  <script src='https://dc-js.github.io/dc.js/js/d3.js' type='text/javascript'>
+  </script>
+  <script src='https://dc-js.github.io/dc.js/js/crossfilter.js' type='text/javascript'>
+  </script>
+  <script src='https://rawgit.com/crossfilter/reductio/master/reductio.js' type='text/javascript'>
+  </script>
+  <script src='https://dc-js.github.io/dc.js/js/dc.js' type='text/javascript'>
+  </script>
+
+  <!-- Link to required CSS libraries: dc.css and bootstrap -->
+  <link href='https://dc-js.github.io/dc.js/css/dc.css' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css"
+    integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+
+  <!-- Some custom CSS for extra formatting that overrides the library defaults -->
+
+
+
+  <style type="text/css">
+    body {
+      background-color: rgb(232, 236, 243);
+      padding-top: 15px;
+    }
+
+    .dc-chart g.row text {
+      fill: black;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1 class="text-center">Wine by Quality Points and Price
+      <p class="lead">Interactive visualization based on a <a
+          href="https://www.kaggle.com/zynicide/wine-reviews">dataset</a> of 130k wine reviews from <a
+          href="http://www.winemag.com/?s=&drink_type=wine">Wine Enthusiast</a></p>
+    </h1>
+    <div class="row">
+      <div class="col-3">
+        <!-- This is the typical pattern for a chart. The chart is named with an id attribute. It has a title in <strong> tags and a reset button link that defaults to hidden (display: none;). The reset button also has javascript code in the href attribute that makes the reset work. -->
+        <div id="variety-chart">
+          <strong>Wine Varieties</strong>
+          <span>
+            <a class="reset" href="javascript:varietyChart.filterAll();dc.redrawAll();" style="display: none;">
+              reset
+            </a>
+          </span>
+        </div>
+      </div>
+      <div class="col-9">
+        <div id="points-chart">
+          <strong>Wines by Point Rating</strong>
+          <span>
+            <a class="reset" href="javascript:pointsChart.filterAll();dc.redrawAll();" style="display: none;">
+              reset
+            </a>
+          </span>
+          <div class="clearfix"></div>
+        </div>
+        <div id="price-chart">
+          <strong>Wines by Price</strong>
+          <span>
+            <a class="reset" href="javascript:priceChart.filterAll();dc.redrawAll();" style="display: none;">
+              reset
+            </a>
+          </span>
+          <div class="clearfix"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- This rest of the file is javascript to create the charts -->
+  <script type="text/javascript">
+
+    // Attach charts to the id's from <div> tags above and save to javascript variables
+    var varietyChart = dc.rowChart('#variety-chart');
+    var pointsChart = dc.barChart('#points-chart');
+    var priceChart = dc.barChart('#price-chart');
+
+    // Use D3.js to read in the data csv
+    d3.csv('/Resources/wine-data-clean.csv').then(function (data) {
+
+      // First, the numerical data needs to be converted to javascript number types
+      data.forEach(function (d) {
+        d.points = +d.points;
+        d.price = +d.price;
+      });
+
+      // The data is saved as a crossfilter table
+      var wine = crossfilter(data);
+
+      // For each column of interest, I saved a cross filter dimension. Then I grouped by that dimension and counted the number of rows in that group with reduceCount()
+      var variety = wine.dimension(function (d) { return d.variety; });
+      var varietyGroup = variety.group().reduceCount(function (d) { return d.variety; });
+      var points = wine.dimension(function (d) { return d.points; });
+      var pointsGroup = points.group().reduceCount(function (d) { return d.points; });
+      var price = wine.dimension(function (d) { return d.price; });
+      var priceGroup = price.group();
+
+      // The average calculation is more complex to do in a reduce function like the ones above. The reductio library solves this problem below.
+      var reducer = reductio()
+        .count(true)
+        .avg(function (d) { return d.points });
+      reducer(priceGroup);
+
+      // Create the various charts. The chart properties are set with a chain of methods as shown below. Many of the chart properties are self evident but I commented properties that may be unclear.
+      varietyChart
+        .width(250)
+        .height(670)
+        .margins({ top: 20, left: 10, right: 10, bottom: 89 })
+        .dimension(variety) // Specify dimension to use
+        .group(varietyGroup) // Specify grouping to use
+        .gap(1) // Set gap between bars
+        .elasticX(true) // Allow X to reformat itself when data changes
+        .xAxis().ticks(5); // Set number of X ticks
+
+      pointsChart
+        .width(875)
+        .height(290)
+        .margins({ top: 10, right: 10, bottom: 20, left: 40 })
+        .dimension(points)
+        .group(pointsGroup)
+        .transitionDuration(500)
+        .centerBar(true)
+        .gap(1)
+        .x(d3.scaleLinear().domain([80, 100]))
+        .elasticY(true)
+        .renderHorizontalGridLines(true)
+        .xAxis().ticks(20);
+
+      priceChart
+        .width(875)
+        .height(290)
+        .margins({ top: 10, right: 10, bottom: 20, left: 40 })
+        .dimension(price)
+        .group(priceGroup)
+        .valueAccessor(function (p) {
+          return p.value.count;
+        })
+        .transitionDuration(500)
+        .centerBar(true)
+        .gap(0)
+        .x(d3.scaleLinear().domain([0, 150]))
+        .elasticY(true)
+        .renderHorizontalGridLines(true)
+        .xAxis().ticks(20).tickFormat(function (v) { return '$' + v; });
+      // Adds '$' to the X axis labels
+
+
+      // Render all of the dc.js charts
+      dc.renderAll();
+    });
+    
+  </script>
+
+  <!-- Copyright -->
+  <div class="footer-copyright text-center text-black-50 py-3">© 2020 Copyright:
+    <a class="dark-grey-text" href="https://github.com/ladyj-dev/Wine_All_You_Want"> Nic Pittman & Arica Jackson</a>
+  </div>
+  <!-- Copyright -->
+ <!-- ######################################## -->
+ <nav class="nav-menu">
+  <ul>
+    <li class="active"><a href="index.html"><i class="bx bx-home"></i> <span>Home</span></a></li>
+    <li><a href="Why-Arica.html"><i class="bx bx-file-blank"></i> <span>Data</span></a></li>
+    <li><a href="#How-AricaML.html"><i class="bx bx-book-content"></i>How</a></li>
+    <li><a href="aricawhyviz.html"><i class="bx bx-envelope"></i>Why</a></li>
+    <li><a href="where-arica-us.html"><i class="bx bx-envelope"></i>Where-USA</a></li>
+    <li><a href="where-arica-$-home-global.html"><i class="bx bx-envelope"></i>Where-Global</a></li>
+    <li><a href="Wine_World_Nic.html"><i class="bx bx-envelope"></i>World of Wine</a></li>    
+    <li><a href="Wine_Words_Nic.html"><i class="bx bx-envelope"></i>Words of Wine</a></li>
+    <li><a href="NicsD3.html"><i class="bx bx-envelope"></i>Wine in D3</a></li>
+    <li><a href="blank-extra.html"><i class="bx bx-envelope"></i>Wine All You Want</a></li>
+    <li><a href="conclusion.html"><i class="bx bx-server"></i> Contact Us</a></li>
+  </ul>
+</nav> 
+  
+</body>
+
+</html>
